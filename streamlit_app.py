@@ -20,9 +20,21 @@ in-memory Chroma collection safe here for a multi-user hosted demo -- one
 visitor's uploaded document never leaks into another visitor's session.
 """
 
+import os
 import re
 
 import streamlit as st
+
+# Streamlit Community Cloud's secrets manager exposes values via st.secrets,
+# not automatically as OS environment variables -- but core/agent.py reads
+# os.environ["GROQ_API_KEY"] directly (so the same code works unmodified
+# whether it's run locally against a .env file or here). Bridge it before
+# importing core.agent, which reads the key at module-import time.
+try:
+    if "GROQ_API_KEY" in st.secrets:
+        os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
+except Exception:
+    pass  # no secrets.toml locally -- falls back to .env / an already-set env var
 
 from core.extraction import extract_text
 from core.chunking import chunk_text
