@@ -45,6 +45,12 @@ chunk ID(s) you used, e.g. [chunk_3].
 numbers you retrieved, but never invent a number that wasn't retrieved.
 - If the retrieved passages don't contain the answer after a reasonable \
 number of searches, say so explicitly instead of guessing.
+- Write your answer as plain prose in complete sentences. Do not use \
+markdown tables, headers, or bullet lists -- if you need to present several \
+figures, do it as a short sentence list (e.g. "Americas was $45,781M, \
+Europe was $29,395M, ..."). You may use **bold** for key figures, but \
+every bold or italic marker you open must be closed within the same \
+sentence -- unmatched markdown formatting renders broken.
 """
 
 SEARCH_TOOL = {
