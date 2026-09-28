@@ -146,8 +146,6 @@ if question:
             with st.spinner("Searching the document..."):
                 result = run_agent(st.session_state.collection, question)
             st.markdown(_sanitize_for_display(result.answer))
-            with st.expander("Debug: raw answer text"):
-                st.code(repr(result.answer))
             if result.sources:
                 with st.expander(f"Sources ({len(result.sources)})"):
                     st.write(", ".join(result.sources))
