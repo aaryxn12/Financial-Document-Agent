@@ -18,6 +18,7 @@ from typing import Dict
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel
+from mangum import Mangum
 
 from core.extraction import extract_text
 from core.chunking import chunk_text
@@ -73,3 +74,5 @@ async def ask_document(document_id: str, request: AskRequest) -> AskResponse:
 
     result = run_agent(collection, request.question)
     return AskResponse(answer=result.answer, sources=result.sources, iterations=result.iterations)
+
+handler = Mangum(app)

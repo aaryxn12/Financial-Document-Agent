@@ -24,9 +24,38 @@ from groq import Groq
 
 from core.retrieval import query_collection
 
+# load_dotenv()
+
+# client = Groq(api_key=os.environ["GROQ_API_KEY"])
+
 load_dotenv()
 
-client = Groq(api_key=os.environ["GROQ_API_KEY"])
+
+def _get_groq_api_key() -> str:
+    """Resolve the Groq API key.
+
+    Local dev and the Streamlit Cloud deployment set GROQ_API_KEY as a plain
+    env var. The Lambda deployment deliberately does not -- it only grants
+    the execution role IAM permission to read this one SSM parameter, so
+    falling back to Parameter Store here is what actually runs in that
+    environment.
+    """
+    api_key = os.environ.get("GROQ_API_KEY")
+    if api_key:
+        return api_key
+
+    import boto3  # deferred: only the Lambda path needs this, so it's not
+                  # a hard dependency for local dev or Streamlit Cloud
+
+    ssm = boto3.client("ssm", region_name="ap-south-1")
+    response = ssm.get_parameter(
+        Name="/financial-document-agent/groq-api-key",
+        WithDecryption=True,
+    )
+    return response["Parameter"]["Value"]
+
+
+client = Groq(api_key=_get_groq_api_key())
 
 MODEL = "openai/gpt-oss-20b"
 MAX_ITERATIONS = 5
