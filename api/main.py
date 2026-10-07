@@ -2,14 +2,15 @@
 FastAPI layer exposing the Financial Document Agent's core RAG pipeline as
 a REST API.
 
-State handling: each uploaded document gets its own in-memory Chroma
-collection, held in a process-local dict keyed by a generated document ID.
-This is intentionally simple -- fine for a single-instance demo deployment,
-but uploaded documents don't survive a server restart and this won't work
-correctly behind multiple worker processes (each worker would have its own
-empty dict). A production version would move this to a shared store (e.g.
-a persistent Chroma instance keyed by document ID, or Redis for the
-mapping) instead of process memory.
+State handling: each uploaded document's chunk texts are persisted to S3
+(api/document_store.py), since Lambda gives no guarantee that two requests
+for the same document_id land on the same execution environment. The
+in-memory Chroma collection itself is never persisted -- Chroma re-derives
+identical embeddings from the same chunk text deterministically, so it's
+cheaper to rebuild than to serialize. _documents acts as a warm-cache: fast
+when a later request happens to land on the same warm environment that
+handled the upload or a prior question, falling back to an S3 fetch plus a
+fresh collection rebuild otherwise.
 """
 
 import io
@@ -24,6 +25,7 @@ from core.extraction import extract_text
 from core.chunking import chunk_text
 from core.retrieval import create_collection, add_chunks
 from core.agent import run_agent
+from api.document_store import save_chunks, load_chunks
 
 app = FastAPI(title="Financial Document Agent API")
 
@@ -62,6 +64,7 @@ async def upload_document(file: UploadFile = File(...)) -> UploadResponse:
 
     document_id = uuid.uuid4().hex
     _documents[document_id] = collection
+    save_chunks(document_id, chunks)
 
     return UploadResponse(document_id=document_id, chunk_count=len(chunks))
 
@@ -70,7 +73,12 @@ async def upload_document(file: UploadFile = File(...)) -> UploadResponse:
 async def ask_document(document_id: str, request: AskRequest) -> AskResponse:
     collection = _documents.get(document_id)
     if collection is None:
-        raise HTTPException(status_code=404, detail="Unknown document_id.")
+        chunks = load_chunks(document_id)
+        if chunks is None:
+            raise HTTPException(status_code=404, detail="Unknown document_id.")
+        collection = create_collection()
+        add_chunks(collection, chunks)
+        _documents[document_id] = collection
 
     result = run_agent(collection, request.question)
     return AskResponse(answer=result.answer, sources=result.sources, iterations=result.iterations)

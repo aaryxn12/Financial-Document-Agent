@@ -52,7 +52,9 @@ def _get_groq_api_key() -> str:
         Name="/financial-document-agent/groq-api-key",
         WithDecryption=True,
     )
-    return response["Parameter"]["Value"]
+    # Strip stray whitespace: a trailing newline in the stored value makes
+    # the HTTP client reject the Authorization header.
+    return response["Parameter"]["Value"].strip()
 
 
 client = Groq(api_key=_get_groq_api_key())
