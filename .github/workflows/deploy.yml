@@ -1,0 +1,71 @@
+name: Deploy to AWS Lambda
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never run two deploys at once; let the running one finish.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+# Needed so the job can request the GitHub OIDC "badge" for AWS.
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: financial-document-agent
+  LAMBDA_FUNCTION: financial-document-agent
+
+jobs:
+  deploy:
+    # Native arm64 runner: the Lambda is arm64, so no emulation is needed.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Assume AWS role via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        id: image
+        env:
+          IMAGE_URI: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+        run: |
+          docker build \
+            --platform linux/arm64 \
+            --provenance=false \
+            --sbom=false \
+            -t "$IMAGE_URI" .
+          docker push "$IMAGE_URI"
+          echo "uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+
+      - name: Point Lambda at the new image
+        run: |
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_FUNCTION" \
+            --image-uri "${{ steps.image.outputs.uri }}" \
+            --output text --query 'LastUpdateStatus'
+
+      - name: Wait until the update finishes
+        run: aws lambda wait function-updated --function-name "$LAMBDA_FUNCTION"
+
+      - name: Smoke test the live URL
+        env:
+          FUNCTION_URL: ${{ vars.FUNCTION_URL }}
+        run: |
+          curl --fail --silent --show-error --max-time 60 \
+            "${FUNCTION_URL%/}/openapi.json" > /dev/null
+          echo "Live URL is serving the new version."
