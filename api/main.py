@@ -27,7 +27,7 @@ from core.retrieval import create_collection, add_chunks
 from core.agent import run_agent
 from api.document_store import save_chunks, load_chunks
 
-app = FastAPI(title="Financial Document Agent API")
+app = FastAPI(title="Financial Document Agent API (deployed by CI)")
 
 # document_id -> Chroma collection. Process-local; see module docstring.
 _documents: Dict[str, object] = {}
