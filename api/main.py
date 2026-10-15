@@ -66,7 +66,7 @@ async def upload_document(file: UploadFile = File(...)) -> UploadResponse:
     _documents[document_id] = collection
     save_chunks(document_id, chunks)
 
-    return UploadResponse(document_id=document_id, chunk_count=0)
+    return UploadResponse(document_id=document_id, chunk_count=len(chunks))
 
 
 @app.post("/documents/{document_id}/ask", response_model=AskResponse)
