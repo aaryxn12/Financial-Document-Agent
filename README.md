@@ -2,7 +2,9 @@
 
 Upload a financial PDF (10-K, earnings release, quarterly statement) and ask questions in plain English. The agent searches the document, answers from what it finds, and cites the exact source chunks.
 
-**Try it:** [live Streamlit demo](https://YOUR-STREAMLIT-APP.streamlit.app) · also deployed as a serverless API on AWS with a CI/CD pipeline (see [Deployment](#deployment-on-aws) below).
+**Try it:** [live Streamlit demo](https://financial-document-agent-cjgxykuorexqf6ya6q8appx.streamlit.app) · also deployed as a serverless API on AWS with a CI/CD pipeline (see [Deployment](#deployment-on-aws) below).
+
+> The demo runs on a free tier and sleeps when idle. If you see a "wake this app up" button, click it and give it a few seconds.
 
 ## What it does
 
