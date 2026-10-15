@@ -53,7 +53,17 @@ jobs:
           docker push "$IMAGE_URI"
           echo "uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
+      - name: Remember the image Lambda is running today
+        id: previous
+        run: |
+          PREV=$(aws lambda get-function \
+            --function-name "$LAMBDA_FUNCTION" \
+            --query 'Code.ResolvedImageUri' --output text)
+          echo "uri=$PREV" >> "$GITHUB_OUTPUT"
+          echo "Currently live: $PREV"
+
       - name: Point Lambda at the new image
+        id: update
         run: |
           aws lambda update-function-code \
             --function-name "$LAMBDA_FUNCTION" \
@@ -89,3 +99,16 @@ jobs:
           grep -q "Unknown document_id" body.json
 
           echo "Live URL passed all smoke checks."
+
+      # Runs only if something failed AFTER Lambda was switched to the new image
+      # (e.g. the smoke test). If the build or push failed, nothing changed on
+      # Lambda and there is nothing to undo.
+      - name: Roll back to the previous image
+        if: failure() && steps.update.outcome == 'success'
+        run: |
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_FUNCTION" \
+            --image-uri "${{ steps.previous.outputs.uri }}" \
+            --output text --query 'LastUpdateStatus'
+          aws lambda wait function-updated --function-name "$LAMBDA_FUNCTION"
+          echo "::error::Deploy failed its checks; rolled back to ${{ steps.previous.outputs.uri }}"
